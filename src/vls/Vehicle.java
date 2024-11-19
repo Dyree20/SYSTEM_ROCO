@@ -16,4 +16,9 @@ public class Vehicle {
         this.driverName = driverName;
         this.driverContact = driverContact;
     }
+
+    // Method to get full driver info
+    public String getDriverInfo() {
+        return "Driver: " + driverName + " (ID: " + driverId + ", Contact: " + driverContact + ")";
+    }
 }

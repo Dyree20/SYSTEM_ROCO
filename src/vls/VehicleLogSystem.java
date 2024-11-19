@@ -1,11 +1,6 @@
 package vls;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.ResultSet;
+import java.sql.*;
 
 public class VehicleLogSystem {
     private Connection connection;
@@ -17,55 +12,54 @@ public class VehicleLogSystem {
         }
     }
 
+    // Connect to SQLite database
     private Connection connectDB() {
         try {
             Class.forName("org.sqlite.JDBC");
-            Connection con = DriverManager.getConnection("jdbc:sqlite:vls.db");
-            System.out.println("Connection Successful");
-            return con;
+            return DriverManager.getConnection("jdbc:sqlite:vls.db");
         } catch (Exception e) {
             System.out.println("Connection Failed: " + e.getMessage());
             return null;
         }
     }
 
-   private void createTable() {
-    String dropVehiclesTable = "DROP TABLE IF EXISTS vehicles";
-    String dropLogsTable = "DROP TABLE IF EXISTS vehicle_logs";
+    // Create tables for vehicles and vehicle logs
+    private void createTable() {
+        String dropVehiclesTable = "DROP TABLE IF EXISTS vehicles";
+        String dropLogsTable = "DROP TABLE IF EXISTS vehicle_logs";
 
-    String createVehiclesTable = "CREATE TABLE IF NOT EXISTS vehicles (" +
-            "plate_no TEXT PRIMARY KEY, brand TEXT, model TEXT, driver_id TEXT, driver_name TEXT, driver_contact TEXT)";
-    String createLogsTable = "CREATE TABLE IF NOT EXISTS vehicle_logs (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, plate_no TEXT, oil_used TEXT, date TEXT, purpose_of_use TEXT, status TEXT, " +
-            "FOREIGN KEY(plate_no) REFERENCES vehicles(plate_no))";
+        String createVehiclesTable = "CREATE TABLE IF NOT EXISTS vehicles (" +
+                "plate_no TEXT PRIMARY KEY, brand TEXT, model TEXT, driver_id TEXT, driver_name TEXT, driver_contact TEXT)";
+        String createLogsTable = "CREATE TABLE IF NOT EXISTS vehicle_logs (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, plate_no TEXT, oil_used TEXT, date TEXT, purpose_of_use TEXT, status TEXT, " +
+                "FOREIGN KEY(plate_no) REFERENCES vehicles(plate_no))";
 
-    try (Statement stmt = connection.createStatement()) {
-        // Drop old tables if they exist
-        stmt.executeUpdate(dropVehiclesTable);
-        stmt.executeUpdate(dropLogsTable);
+        try (Statement stmt = connection.createStatement()) {
+            // Drop old tables if they exist
+            stmt.executeUpdate(dropVehiclesTable);
+            stmt.executeUpdate(dropLogsTable);
 
-        // Create tables with the correct schema
-        stmt.executeUpdate(createVehiclesTable);
-        stmt.executeUpdate(createLogsTable);
-        System.out.println("Tables created successfully.");
-    } catch (SQLException e) {
-        System.out.println("Error creating tables: " + e.getMessage());
+            // Create tables with the correct schema
+            stmt.executeUpdate(createVehiclesTable);
+            stmt.executeUpdate(createLogsTable);
+            System.out.println("Tables created successfully.");
+        } catch (SQLException e) {
+            System.out.println("Error creating tables: " + e.getMessage());
+        }
     }
-}
 
+    // Fetch vehicle by plate number
     public Vehicle getVehicleByPlateNo(String plateNo) {
         String sql = "SELECT * FROM vehicles WHERE plate_no = ?";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, plateNo);
             try (ResultSet rs = statement.executeQuery()) {
                 if (rs.next()) {
-                    
                     String brand = rs.getString("brand");
                     String model = rs.getString("model");
                     String driverId = rs.getString("driver_id");
                     String driverName = rs.getString("driver_name");
                     String driverContact = rs.getString("driver_contact");
-
                     
                     return new Vehicle(plateNo, brand, model, driverId, driverName, driverContact);
                 }
@@ -73,9 +67,10 @@ public class VehicleLogSystem {
         } catch (SQLException e) {
             System.out.println("Error fetching vehicle: " + e.getMessage());
         }
-        return null;  
+        return null;  // Vehicle not found
     }
 
+    // Add vehicle and driver to the database
     public void addVehicle(Vehicle vehicle) {
         String sql = "INSERT OR IGNORE INTO vehicles (plate_no, brand, model, driver_id, driver_name, driver_contact) VALUES (?, ?, ?, ?, ?, ?)";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -92,6 +87,7 @@ public class VehicleLogSystem {
         }
     }
 
+    // Add a log entry for a vehicle
     public void addLog(VehicleLog log) {
         String checkStatusSQL = "SELECT status FROM vehicle_logs WHERE plate_no = ? ORDER BY id DESC LIMIT 1";
         String addLogSQL = "INSERT INTO vehicle_logs (plate_no, oil_used, date, purpose_of_use, status) VALUES (?, ?, ?, ?, 'in use')";
@@ -116,34 +112,60 @@ public class VehicleLogSystem {
         }
     }
 
+    // Display vehicle logs with driver information in table format
     public void displayLogs() {
         String sql = "SELECT * FROM vehicle_logs";
-        System.out.printf("%-15s %-15s %-10s %-30s %-15s%n", "Plate No", "Oil Used", "Date", "Purpose", "Status");
+        System.out.println("\nVehicle Logs:\n");
+        System.out.printf("%-15s %-15s %-12s %-20s %-10s %-50s%n", 
+                          "Plate No", "Oil Used", "Date", "Purpose of Use", "Status", "Driver Info");
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------");
+
         try (Statement statement = connection.createStatement(); ResultSet rs = statement.executeQuery(sql)) {
             while (rs.next()) {
-                System.out.printf("%-15s %-15s %-10s %-30s %-15s%n",
-                        rs.getString("plate_no"), rs.getString("oil_used"), rs.getString("date"),
-                        rs.getString("purpose_of_use"), rs.getString("status"));
+                String plateNo = rs.getString("plate_no");
+                Vehicle vehicle = getVehicleByPlateNo(plateNo);  // Fetch the vehicle details including driver info
+                String oilUsed = rs.getString("oil_used");
+                String date = rs.getString("date");
+                String purposeOfUse = rs.getString("purpose_of_use");
+                String status = rs.getString("status");
+
+                // Create VehicleLog object to display all info including driver info
+                VehicleLog log = new VehicleLog(vehicle, oilUsed, date, purposeOfUse);
+                log.status = status; // Set the status of the log
+                System.out.printf("%-15s %-15s %-12s %-20s %-10s %-50s%n",
+                        log.vehicle.plateNo, log.oilUsed, log.date, log.purposeOfUse, log.status, log.vehicle.getDriverInfo());
             }
         } catch (SQLException e) {
             System.out.println("Error displaying logs: " + e.getMessage());
         }
     }
 
+    // Display available vehicles (not in use) in table format
     public void displayAvailableVehicles() {
         String sql = "SELECT * FROM vehicles WHERE plate_no NOT IN (SELECT plate_no FROM vehicle_logs WHERE status = 'in use')";
-        System.out.printf("%-15s %-15s %-10s %-30s %-15s%n", "Plate No", "Brand", "Model", "Driver Name", "Driver Contact");
+        System.out.println("\nAvailable Vehicles:\n");
+        System.out.printf("%-15s %-15s %-12s %-25s %-15s %-50s%n", 
+                          "Plate No", "Brand", "Model", "Driver Name", "Driver Contact", "Driver Info");
+        System.out.println("-------------------------------------------------------------------------------------------------------------------------------");
+
         try (Statement statement = connection.createStatement(); ResultSet rs = statement.executeQuery(sql)) {
             while (rs.next()) {
-                System.out.printf("%-15s %-15s %-10s %-30s %-15s%n",
-                        rs.getString("plate_no"), rs.getString("brand"), rs.getString("model"),
-                        rs.getString("driver_name"), rs.getString("driver_contact"));
+                String plateNo = rs.getString("plate_no");
+                String brand = rs.getString("brand");
+                String model = rs.getString("model");
+                String driverName = rs.getString("driver_name");
+                String driverContact = rs.getString("driver_contact");
+
+                System.out.printf("%-15s %-15s %-12s %-25s %-15s %-50s%n",
+                        plateNo, brand, model, driverName, driverContact, 
+                        "Driver: " + driverName + " (Contact: " + driverContact + ")");
             }
         } catch (SQLException e) {
             System.out.println("Error displaying available vehicles: " + e.getMessage());
         }
     }
 
+    // Update vehicle log (change purpose or date)
     public void updateVehicleLog(String plateNo, String newDate, String newPurpose) {
         String sql = "UPDATE vehicle_logs SET date = ?, purpose_of_use = ? WHERE plate_no = ? AND status = 'in use'";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -161,6 +183,7 @@ public class VehicleLogSystem {
         }
     }
 
+    // Delete a vehicle log entry
     public void deleteLog(String plateNo) {
         String sql = "DELETE FROM vehicle_logs WHERE plate_no = ?";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
