@@ -4,107 +4,100 @@ import java.util.Scanner;
 
 public class VLS {
     public static void main(String[] args) {
-    Scanner scanner = new Scanner(System.in);
-    VehicleLogSystem vls = new VehicleLogSystem();
+        Scanner scanner = new Scanner(System.in);
+        VehicleLogSystem vls = new VehicleLogSystem();  // Initialize the vehicle log system
+        boolean running = true;
 
-    boolean exit = false;
+        while (running) {
+            // Display the main menu
+            System.out.println("\n--- Vehicle Log System ---");
+            System.out.println("1. Add Vehicle");
+            System.out.println("2. Add Vehicle Log");
+            System.out.println("3. View Vehicle Logs");
+            System.out.println("4. View Available Vehicles");
+            System.out.println("5. Mark Vehicle as Done");
+            System.out.println("6. Delete Vehicle Log");
+            System.out.println("7. Exit");
+            System.out.print("Choose an option: ");
+            int choice = scanner.nextInt();
+            scanner.nextLine();  // Consume the newline character
 
-    while (!exit) {
-        System.out.println("\n--- Vehicle Log System Menu ---");
-        System.out.println("1. Add Vehicle");
-        System.out.println("2. Add Vehicle Log");
-        System.out.println("3. Display Vehicle Logs");
-        System.out.println("4. Display Available Vehicles");
-        System.out.println("5. Update Vehicle Log");
-        System.out.println("6. Delete Vehicle Log");
-        System.out.println("0. Exit");
-        System.out.print("Enter your choice: ");
-        int choice = scanner.nextInt();
-        scanner.nextLine();
+            switch (choice) {
+                case 1:
+                    // Add a vehicle
+                    System.out.print("Enter plate number: ");
+                    String plateNo = scanner.nextLine();
+                    System.out.print("Enter brand: ");
+                    String brand = scanner.nextLine();
+                    System.out.print("Enter model: ");
+                    String model = scanner.nextLine();
+                    System.out.print("Enter driver ID: ");
+                    String driverId = scanner.nextLine();
+                    System.out.print("Enter driver name: ");
+                    String driverName = scanner.nextLine();
+                    System.out.print("Enter driver contact: ");
+                    String driverContact = scanner.nextLine();
 
-        switch (choice) {
-            case 1:
-                // Add a vehicle (no changes needed)
-                System.out.print("Enter plate number: ");
-                String plateNo = scanner.nextLine();
-                System.out.print("Enter vehicle brand: ");
-                String brand = scanner.nextLine();
-                System.out.print("Enter vehicle model: ");
-                String model = scanner.nextLine();
+                    Vehicle vehicle = new Vehicle(plateNo, brand, model, driverId, driverName, driverContact);
+                    vls.addVehicle(vehicle);
+                    break;
 
-                // Driver details
-                System.out.print("Enter driver ID: ");
-                String driverId = scanner.nextLine();
-                System.out.print("Enter driver name: ");
-                String driverName = scanner.nextLine();
-                System.out.print("Enter driver contact: ");
-                String driverContact = scanner.nextLine();
+                case 2:
+                    // Add a vehicle log
+                    System.out.print("Enter plate number: ");
+                    plateNo = scanner.nextLine();
+                    Vehicle logVehicle = vls.getVehicleByPlateNo(plateNo);
+                    if (logVehicle == null) {
+                        System.out.println("Vehicle not found.");
+                        break;
+                    }
 
-                Vehicle vehicle = new Vehicle(plateNo, brand, model, driverId, driverName, driverContact);
-                vls.addVehicle(vehicle);
-                break;
+                    System.out.print("Enter oil used: ");
+                    String oilUsed = scanner.nextLine();
+                    System.out.print("Enter date (YYYY-MM-DD): ");
+                    String date = scanner.nextLine();
+                    System.out.print("Enter purpose of use: ");
+                    String purpose = scanner.nextLine();
 
-            case 2:
-                vls.displayAvailableVehicles();
-                System.out.print("Enter plate number: ");
-                plateNo = scanner.nextLine();
+                    VehicleLog log = new VehicleLog(logVehicle, oilUsed, date, purpose);
+                    vls.addLog(log);
+                    break;
 
-                // Check if the plate number is valid
-                Vehicle logVehicle = vls.getVehicleByPlateNo(plateNo);
-                if (logVehicle == null) {
-                    System.out.println("Invalid plate number. Please try again.");
-                    break;  // Exit the current iteration and return to the menu
-                }
+                case 3:
+                    // View vehicle logs
+                    vls.displayLogs();
+                    break;
 
-                // If the vehicle is found, proceed to add the log
-                System.out.print("Enter oil used: ");
-                String oilUsed = scanner.nextLine();
-                System.out.print("Enter date (YYYY-MM-DD): ");
-                String date = scanner.nextLine();
-                System.out.print("Enter purpose of use: ");
-                String purpose = scanner.nextLine();
+                case 4:
+                    // View available vehicles
+                    vls.displayAvailableVehicles();
+                    break;
 
-                // Create the log and add it
-                VehicleLog log = new VehicleLog(logVehicle, oilUsed, date, purpose);
-                vls.addLog(log);
-                break;
+                case 5:
+                    // Mark vehicle as done
+                    System.out.print("Enter plate number to mark as done: ");
+                    plateNo = scanner.nextLine();
+                    vls.markVehicleAsDone(plateNo);
+                    break;
 
-            case 3:
-                vls.displayLogs();
-                break;
+                case 6:
+                    // Delete a vehicle log
+                    System.out.print("Enter plate number to delete log: ");
+                    plateNo = scanner.nextLine();
+                    vls.deleteLog(plateNo);
+                    break;
 
-            case 4:
-                vls.displayAvailableVehicles();
-                break;
+                case 7:
+                    // Exit the program
+                    running = false;
+                    System.out.println("Exiting the Vehicle Log System. Goodbye!");
+                    break;
 
-            case 5:
-                System.out.print("Enter plate number: ");
-                plateNo = scanner.nextLine();
-                System.out.print("Enter new date (YYYY-MM-DD): ");
-                String newDate = scanner.nextLine();
-                System.out.print("Enter new purpose of use: ");
-                String newPurpose = scanner.nextLine();
-
-                vls.updateVehicleLog(plateNo, newDate, newPurpose);
-                break;
-
-            case 6:
-                vls.displayLogs();
-                System.out.print("Enter the plate number of the log to delete: ");
-                String plateToDelete = scanner.nextLine();
-                vls.deleteLog(plateToDelete);
-                break;
-
-            case 0:
-                exit = true;
-                System.out.println("Exiting the system.");
-                break;
-
-            default:
-                System.out.println("Invalid choice. Please try again.");
+                default:
+                    System.out.println("Invalid option. Please try again.");
+            }
         }
-    }
 
-    scanner.close();
-}
+        scanner.close();
+    }
 }

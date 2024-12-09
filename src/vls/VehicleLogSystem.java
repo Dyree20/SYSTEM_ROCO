@@ -60,7 +60,7 @@ public class VehicleLogSystem {
                     String driverId = rs.getString("driver_id");
                     String driverName = rs.getString("driver_name");
                     String driverContact = rs.getString("driver_contact");
-                    
+
                     return new Vehicle(plateNo, brand, model, driverId, driverName, driverContact);
                 }
             }
@@ -87,7 +87,7 @@ public class VehicleLogSystem {
         }
     }
 
-    // Add a log entry for a vehicle
+    // Add a log entry for a vehicle with validation
     public void addLog(VehicleLog log) {
         String checkStatusSQL = "SELECT status FROM vehicle_logs WHERE plate_no = ? ORDER BY id DESC LIMIT 1";
         String addLogSQL = "INSERT INTO vehicle_logs (plate_no, oil_used, date, purpose_of_use, status) VALUES (?, ?, ?, ?, 'in use')";
@@ -95,107 +95,109 @@ public class VehicleLogSystem {
         try (PreparedStatement checkStmt = connection.prepareStatement(checkStatusSQL)) {
             checkStmt.setString(1, log.vehicle.plateNo);
             ResultSet rs = checkStmt.executeQuery();
-            if (rs.next() && "in use".equalsIgnoreCase(rs.getString("status"))) {
-                System.out.println("Vehicle is currently in use. Cannot add a new log.");
-                return;
+            if (rs.next()) {
+                String lastStatus = rs.getString("status");
+                if (lastStatus.equals("in use")) {
+                    System.out.println("This vehicle is already in use. Cannot use it again until marked as done.");
+                    return;
+                }
             }
-            try (PreparedStatement statement = connection.prepareStatement(addLogSQL)) {
-                statement.setString(1, log.vehicle.plateNo);
-                statement.setString(2, log.oilUsed);
-                statement.setString(3, log.date);
-                statement.setString(4, log.purposeOfUse);
-                statement.executeUpdate();
-                System.out.println("Log added successfully. Vehicle marked as 'in use'.");
+
+            // Proceed to add log
+            try (PreparedStatement stmt = connection.prepareStatement(addLogSQL)) {
+                stmt.setString(1, log.vehicle.plateNo);
+                stmt.setString(2, log.oilUsed);
+                stmt.setString(3, log.date);
+                stmt.setString(4, log.purposeOfUse);
+                stmt.executeUpdate();
+                System.out.println("Vehicle log added successfully.");
             }
         } catch (SQLException e) {
-            System.out.println("Error adding log: " + e.getMessage());
+            System.out.println("Error adding vehicle log: " + e.getMessage());
         }
     }
 
-    // Display vehicle logs with driver information in table format
+    // Display all logs in a table format
     public void displayLogs() {
         String sql = "SELECT * FROM vehicle_logs";
-        System.out.println("\nVehicle Logs:\n");
-        System.out.printf("%-15s %-15s %-12s %-20s %-10s %-50s%n", 
-                          "Plate No", "Oil Used", "Date", "Purpose of Use", "Status", "Driver Info");
-        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------");
+        try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            System.out.println("\n--- Vehicle Logs ---");
+            System.out.println("+------------+----------+------------+------------+--------------------+-------------+");
+            System.out.println("| Plate No  | Oil Used | Date       | Purpose    | Status             | Driver Info |");
+            System.out.println("+------------+----------+------------+------------+--------------------+-------------+");
 
-        try (Statement statement = connection.createStatement(); ResultSet rs = statement.executeQuery(sql)) {
             while (rs.next()) {
                 String plateNo = rs.getString("plate_no");
-                Vehicle vehicle = getVehicleByPlateNo(plateNo);  // Fetch the vehicle details including driver info
                 String oilUsed = rs.getString("oil_used");
                 String date = rs.getString("date");
                 String purposeOfUse = rs.getString("purpose_of_use");
                 String status = rs.getString("status");
 
-                // Create VehicleLog object to display all info including driver info
-                VehicleLog log = new VehicleLog(vehicle, oilUsed, date, purposeOfUse);
-                log.status = status; // Set the status of the log
-                System.out.printf("%-15s %-15s %-12s %-20s %-10s %-50s%n",
-                        log.vehicle.plateNo, log.oilUsed, log.date, log.purposeOfUse, log.status, log.vehicle.getDriverInfo());
+                Vehicle vehicle = getVehicleByPlateNo(plateNo);
+                String driverInfo = vehicle != null ? vehicle.getDriverInfo() : "N/A";
+
+                System.out.printf("| %-10s | %-8s | %-10s | %-10s | %-18s | %-11s |\n",
+                        plateNo, oilUsed, date, purposeOfUse, status, driverInfo);
             }
+            System.out.println("+------------+----------+------------+------------+--------------------+-------------+");
+
         } catch (SQLException e) {
             System.out.println("Error displaying logs: " + e.getMessage());
         }
     }
 
-    // Display available vehicles (not in use) in table format
+    // Display available vehicles in a table format (without vehicles in use)
     public void displayAvailableVehicles() {
         String sql = "SELECT * FROM vehicles WHERE plate_no NOT IN (SELECT plate_no FROM vehicle_logs WHERE status = 'in use')";
-        System.out.println("\nAvailable Vehicles:\n");
-        System.out.printf("%-15s %-15s %-12s %-25s %-15s %-50s%n", 
-                          "Plate No", "Brand", "Model", "Driver Name", "Driver Contact", "Driver Info");
-        System.out.println("-------------------------------------------------------------------------------------------------------------------------------");
+        try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            System.out.println("\n--- Available Vehicles ---");
+            System.out.println("+------------+---------+-------+------------+--------------+-----------------+");
+            System.out.println("| Plate No  | Brand   | Model | Driver ID  | Driver Name | Driver Contact  |");
+            System.out.println("+------------+---------+-------+------------+--------------+-----------------+");
 
-        try (Statement statement = connection.createStatement(); ResultSet rs = statement.executeQuery(sql)) {
             while (rs.next()) {
                 String plateNo = rs.getString("plate_no");
                 String brand = rs.getString("brand");
                 String model = rs.getString("model");
+                String driverId = rs.getString("driver_id");
                 String driverName = rs.getString("driver_name");
                 String driverContact = rs.getString("driver_contact");
 
-                System.out.printf("%-15s %-15s %-12s %-25s %-15s %-50s%n",
-                        plateNo, brand, model, driverName, driverContact, 
-                        "Driver: " + driverName + " (Contact: " + driverContact + ")");
+                System.out.printf("| %-10s | %-7s | %-5s | %-10s | %-12s | %-15s |\n",
+                        plateNo, brand, model, driverId, driverName, driverContact);
             }
+            System.out.println("+------------+---------+-------+------------+--------------+-----------------+");
+
         } catch (SQLException e) {
             System.out.println("Error displaying available vehicles: " + e.getMessage());
         }
     }
 
-    // Update vehicle log (change purpose or date)
-    public void updateVehicleLog(String plateNo, String newDate, String newPurpose) {
-        String sql = "UPDATE vehicle_logs SET date = ?, purpose_of_use = ? WHERE plate_no = ? AND status = 'in use'";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, newDate);
-            statement.setString(2, newPurpose);
-            statement.setString(3, plateNo);
-            int rowsUpdated = statement.executeUpdate();
+    // Mark vehicle as done (status change from "in use" to "done")
+    public void markVehicleAsDone(String plateNo) {
+        String sql = "UPDATE vehicle_logs SET status = 'done' WHERE plate_no = ? AND status = 'in use'";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, plateNo);
+            int rowsUpdated = stmt.executeUpdate();
             if (rowsUpdated > 0) {
-                System.out.println("Log updated successfully.");
+                System.out.println("Vehicle marked as done.");
             } else {
-                System.out.println("No active log found for this vehicle.");
+                System.out.println("No active log found for this vehicle or it's already marked as done.");
             }
         } catch (SQLException e) {
-            System.out.println("Error updating log: " + e.getMessage());
+            System.out.println("Error marking vehicle as done: " + e.getMessage());
         }
     }
 
-    // Delete a vehicle log entry
+    // Delete vehicle log
     public void deleteLog(String plateNo) {
         String sql = "DELETE FROM vehicle_logs WHERE plate_no = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, plateNo);
-            int rowsDeleted = statement.executeUpdate();
-            if (rowsDeleted > 0) {
-                System.out.println("Log deleted successfully.");
-            } else {
-                System.out.println("No log found for this plate number.");
-            }
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, plateNo);
+            stmt.executeUpdate();
+            System.out.println("Vehicle log deleted successfully.");
         } catch (SQLException e) {
-            System.out.println("Error deleting log: " + e.getMessage());
+            System.out.println("Error deleting vehicle log: " + e.getMessage());
         }
     }
 }
